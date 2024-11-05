@@ -1,8 +1,0 @@
-# Notebook
-1. imports at the beginning of Notebook
-2. Notebook should be runnable form top to bottom -> function declarations before the usage of a function
-3. Use markdowns properly to make the Notebook more readable 
-
-# Overall
-1. Good documentation of functions
-2. seperate results and experiments
