@@ -5,6 +5,8 @@ from scipy.io import loadmat
 from scipy.signal import find_peaks, butter, filtfilt, freqz, stft
 from sklearn.decomposition import FastICA, PCA
 from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+
 
 def butter_bandpass(lowcut, highcut, fs, order=4):
     """
@@ -384,7 +386,7 @@ def detect_heartbeat_irregularities(fetal_heartbeat, sampling_rate=360, threshol
     
     return irregular_intervals, irregular_amplitudes
 
-def detect_irregularities(features, eps=41, min_samples=1):
+def detect_irregularities_dbscan(features, eps=41, min_samples=1):
     """
     Detects irregularities in heart rate data using DBSCAN clustering.
 
@@ -442,7 +444,7 @@ def normalize_recordings(recordings, target_length):
     
     return np.array(normalized)
 
-def plot_clusters_with_pca(data, labels):
+def plot_clusters_with_pca(data, labels, use_pca=True):
     """
     Reduce data to 2D using PCA and plot clusters.
     
@@ -454,8 +456,9 @@ def plot_clusters_with_pca(data, labels):
         Cluster labels from DBSCAN or another clustering algorithm.
     """
     # Reduce dimensions to 2D using PCA
-    pca = PCA(n_components=2)
-    reduced_data = pca.fit_transform(data)
+    if use_pca:
+        pca = PCA(n_components=2)
+        data = pca.fit_transform(data)
     
     # Plot results
     plt.figure(figsize=(8, 6))
@@ -469,7 +472,7 @@ def plot_clusters_with_pca(data, labels):
             color = plt.cm.tab10(label / max(unique_labels))  # Unique color per cluster
             label_name = f"Cluster {label}"
         
-        cluster_points = reduced_data[labels == label]
+        cluster_points = data[labels == label]
         plt.scatter(cluster_points[:, 0], cluster_points[:, 1], 
                     c=[color], label=label_name, s=50, alpha=0.6)
     
@@ -480,9 +483,10 @@ def plot_clusters_with_pca(data, labels):
     plt.grid(True)
     plt.show()
 
-def plot_clusters_with_pca_3d(data, labels):
-    pca = PCA(n_components=3)
-    reduced_data = pca.fit_transform(data)
+def plot_clusters_with_pca_3d(data, labels, use_pca=True):
+    if use_pca:
+        pca = PCA(n_components=3)
+        data = pca.fit_transform(data)
     
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection='3d')
@@ -496,7 +500,7 @@ def plot_clusters_with_pca_3d(data, labels):
             color = plt.cm.tab10(label / max(unique_labels))
             label_name = f"Cluster {label}"
         
-        cluster_points = reduced_data[labels == label]
+        cluster_points = data[labels == label]
         ax.scatter(cluster_points[:, 0], cluster_points[:, 1], cluster_points[:, 2], 
                    c=[color], label=label_name, s=50, alpha=0.6)
     
@@ -631,8 +635,25 @@ if __name__ == '__main__':
     # for fetus in fetuses:
     #     detect_heartbeat_irregularities(fetus)
     fetal_heartbeat = normalize_recordings(fetuses, min_length)
-    labels = detect_irregularities(fetal_heartbeat)
+
+    # Clustering extracted features
+    fetal_heartbeat_statistics = []
+    for heartbeat in fetuses:
+        _, _, average_frequency, std_frequency, _, std_amplitude = calculate_statistics(heartbeat, 0, 360, print_statistics=False)
+        fetal_heartbeat_statistics.append([average_frequency, std_frequency, std_amplitude])
+    scalar = StandardScaler()
+    scalar.fit(fetal_heartbeat_statistics)
+    fetal_heartbeat_statistics = scalar.transform(fetal_heartbeat_statistics)
+    labels = detect_irregularities_dbscan(fetal_heartbeat_statistics, eps=0.5, min_samples=1)
     print(labels)
-    plot_clusters_with_pca(fetal_heartbeat, labels)
-    plot_clusters_with_pca_3d(fetal_heartbeat, labels)
+    plot_clusters_with_pca(fetal_heartbeat_statistics, labels, use_pca=True)
+    plot_clusters_with_pca_3d(fetal_heartbeat_statistics, labels, use_pca=False)
     plot_irregular_heartbeats(fetal_heartbeat, labels)
+
+    # Clustering complete heartbeat sequence
+    # Set all recordings to the shortest length
+#    labels = detect_irregularities_dbscan(fetal_heartbeat)
+#    print(labels)
+#    plot_clusters_with_pca(fetal_heartbeat, labels)
+#    plot_clusters_with_pca_3d(fetal_heartbeat, labels)
+#    plot_irregular_heartbeats(fetal_heartbeat, labels)

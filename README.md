@@ -14,9 +14,11 @@
 2. Check frequency of periodic channel and check how many spikes per second do we have?
 3. is this related to the frequency of the heartbeat?
 4. Change distinguishing factor between mother/child to frequency instead of amplitude 
-5. Detect irregularity's in the heartbeat by comparing to an average heartbeat:
-   - Frequency of heartbeats/ number of beats
+5. Detect irregularity's in the heartbeat by comparing extracted features to an average heartbeat:
+   - Frequency of heartbeats/ number of beats and standard deviation
    - Amplitude (if scale is not altered)
+   - TODO: find and reason more features
 6. If irregular heartbeat is detected look at a plot
+7. List top 10 of datasets, that are the clearest outliers
 
 
