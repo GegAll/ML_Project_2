@@ -6,6 +6,8 @@ from scipy.signal import find_peaks, butter, filtfilt, freqz, stft
 from sklearn.decomposition import FastICA, PCA
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import NearestNeighbors
+from sklearn.metrics import silhouette_score
 
 
 def butter_bandpass(lowcut, highcut, fs, order=4):
@@ -386,7 +388,43 @@ def detect_heartbeat_irregularities(fetal_heartbeat, sampling_rate=360, threshol
     
     return irregular_intervals, irregular_amplitudes
 
-def detect_irregularities_dbscan(features, eps=41, min_samples=1):
+# def get_eps(features):
+#     k = 4
+#     nbrs = NearestNeighbors(n_neighbors=k).fit(data)
+#     distances, indices = nbrs.kneighbors(data)
+
+#     # Sort distances for plotting
+#     distances = np.sort(distances[:, -1])  # k-th nearest neighbor distance
+#     plt.plot(distances)
+#     plt.xlabel("Points sorted by distance")
+#     plt.ylabel(f"{k}-th Nearest Neighbor Distance")
+#     plt.title("K-Distance Plot")
+#     plt.show()
+
+def grid_search(features):
+    # Parameter ranges
+    eps_range = np.arange(0.1, 6.0, 0.1)
+    minpts_range = range(1, 10)
+
+    best_score = -1
+    best_params = None
+
+    for eps in eps_range:
+        for minpts in minpts_range:
+            clustering = DBSCAN(eps=eps, min_samples=minpts).fit(features)
+            noise_indices = clustering.labels_ != 1
+            clustering_ex_noise = clustering.labels_[noise_indices]
+            if len(set(clustering_ex_noise)) > 1:  # Avoid single-cluster cases
+                score = silhouette_score(features[noise_indices], clustering_ex_noise)
+                print(f"Parameters: eps={eps}, MinPts={minpts}, Silhouette Score={best_score}")
+                if score > best_score:
+                    best_score = score
+                    best_params = (eps, minpts)
+
+    print(f"Best parameters: eps={best_params[0]}, MinPts={best_params[1]}, Silhouette Score={best_score}")
+    return best_params[0], best_params[1]
+
+def detect_irregularities_dbscan(features, eps=30, min_samples=3):
     """
     Detects irregularities in heart rate data using DBSCAN clustering.
 
@@ -511,59 +549,6 @@ def plot_clusters_with_pca_3d(data, labels, use_pca=True):
     ax.legend()
     plt.show()
 
-# def plot_irregular_heartbeats(data, dbscan_labels):
-#     """
-#     Plots the fetal heartbeats from a dataset using PCA for dimensionality reduction.
-#     Highlights the points not clustered into the largest cluster by DBSCAN.
-
-#     Parameters:
-#     - data: ndarray, shape (n_samples, n_features)
-#         The dataset of fetal heartbeats.
-#     - dbscan_labels: ndarray, shape (n_samples,)
-#         Cluster labels assigned by DBSCAN, where -1 indicates noise.
-
-#     Returns:
-#     - None
-#     """
-#     # Apply PCA to reduce data dimensionality to 2D for plotting
-#     pca = PCA(n_components=2)
-#     data_pca = pca.fit_transform(data)
-
-#     # Identify the largest cluster
-#     unique_labels, counts = np.unique(dbscan_labels, return_counts=True)
-#     largest_cluster_label = unique_labels[np.argmax(counts)]
-
-#     # Filter data points not in the largest cluster
-#     non_largest_cluster_indices = dbscan_labels != largest_cluster_label
-#     non_largest_cluster_data = data_pca[non_largest_cluster_indices]
-
-#     # Plot all data with cluster assignment
-#     plt.figure(figsize=(10, 6))
-#     for label in unique_labels:
-#         if label == -1:  # Noise points
-#             color = 'gray'
-#             label_text = 'Noise'
-#         elif label == largest_cluster_label:
-#             color = 'blue'
-#             label_text = f'Largest Cluster (Label {label})'
-#         else:
-#             color = 'green'
-#             label_text = f'Cluster {label}'
-
-#         cluster_indices = dbscan_labels == label
-#         plt.scatter(data_pca[cluster_indices, 0], data_pca[cluster_indices, 1], 
-#                     label=label_text, alpha=0.5)
-
-#     # Plot points not in the largest cluster in red
-#     plt.scatter(non_largest_cluster_data[:, 0], non_largest_cluster_data[:, 1], 
-#                 color='red', label='Excluded Heartbeats', edgecolor='k')
-
-#     # Customize plot
-#     plt.title("DBSCAN Clustering of Fetal Heartbeats")
-#     plt.xlabel("PCA Component 1")
-#     plt.ylabel("PCA Component 2")
-#     plt.legend()
-#     plt.show()
 
 def plot_irregular_heartbeats(recordings, dbscan_labels, sampling_rate=360):
     """
@@ -586,7 +571,7 @@ def plot_irregular_heartbeats(recordings, dbscan_labels, sampling_rate=360):
     largest_cluster_label = unique_labels[np.argmax(counts)]
 
     # Find indices of recordings not in the largest cluster
-    non_largest_cluster_indices = dbscan_labels != largest_cluster_label
+    non_largest_cluster_indices = dbscan_labels == -1
     irregular_heartbeats = recordings[non_largest_cluster_indices]
 
     # Create subplots for each irregular heartbeat
@@ -597,11 +582,12 @@ def plot_irregular_heartbeats(recordings, dbscan_labels, sampling_rate=360):
     fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows), squeeze=False)
     time_axis = np.arange(recordings.shape[1]) / sampling_rate
 
+    indices = np.where(non_largest_cluster_indices)[0]
     for i, heartbeat in enumerate(irregular_heartbeats):
         row, col = divmod(i, cols)
         ax = axes[row, col]
-        ax.plot(time_axis, heartbeat, label=f"Irregular HB {i + 1}")
-        ax.set_title(f"Irregular HB {i + 1}")
+        ax.plot(time_axis, heartbeat, label=f"Irregular HB {indices[i]}")
+        # ax.set_title(f"Irregular HB {indei}")
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Amplitude")
         ax.grid(True)
@@ -616,7 +602,7 @@ def plot_irregular_heartbeats(recordings, dbscan_labels, sampling_rate=360):
     plt.show()
 
 if __name__ == '__main__':
-    base_path = 'data/'
+    base_path = 'data/synthetic/'
     mothers = []
     fetuses = []
     min_length = 1000000000
@@ -644,16 +630,9 @@ if __name__ == '__main__':
     scalar = StandardScaler()
     scalar.fit(fetal_heartbeat_statistics)
     fetal_heartbeat_statistics = scalar.transform(fetal_heartbeat_statistics)
-    labels = detect_irregularities_dbscan(fetal_heartbeat_statistics, eps=0.5, min_samples=1)
+    eps, min_samples = grid_search(fetal_heartbeat_statistics)
+    labels = detect_irregularities_dbscan(fetal_heartbeat_statistics, eps=eps, min_samples=min_samples)
     print(labels)
     plot_clusters_with_pca(fetal_heartbeat_statistics, labels, use_pca=True)
     plot_clusters_with_pca_3d(fetal_heartbeat_statistics, labels, use_pca=False)
     plot_irregular_heartbeats(fetal_heartbeat, labels)
-
-    # Clustering complete heartbeat sequence
-    # Set all recordings to the shortest length
-#    labels = detect_irregularities_dbscan(fetal_heartbeat)
-#    print(labels)
-#    plot_clusters_with_pca(fetal_heartbeat, labels)
-#    plot_clusters_with_pca_3d(fetal_heartbeat, labels)
-#    plot_irregular_heartbeats(fetal_heartbeat, labels)
