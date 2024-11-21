@@ -6,7 +6,6 @@ from scipy.signal import find_peaks, butter, filtfilt, freqz, stft
 from sklearn.decomposition import FastICA, PCA
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
-from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics import silhouette_score
 
 
@@ -106,7 +105,7 @@ def apply_ica(path):
     values = data['val']
     print(values[0].shape)
     # apply ICA on data
-    ica = FastICA()
+    ica = FastICA(max_iter=10000, random_state=0)
     result = np.transpose(ica.fit_transform(np.transpose(values[0])))
 
     # Make sure that the amplitudes ar4e positives for consistency (sometimes ICA makes them negative)
@@ -142,18 +141,26 @@ def post_process(result, lowcut, highcut, fs=360, plot=False):
     """
     results = []
     X = np.linspace(0, len(result[0]) / fs, len(result[0]))
+    
+    if plot:
+        # Create a figure with 4 subplots (2 rows x 2 columns)
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))  
 
     for i, component in enumerate(result):
-        # filtered_signal = apply_bandpass_filter(component, lowcut, highcut, fs)
-        filtered_signal = component
+        filtered_signal = apply_bandpass_filter(component, lowcut, highcut, fs)
+        # filtered_signal = component
         results.append(filtered_signal)
         # print(len(find_peaks(filtered_signal)[0]))
+        # Plot on the respective subplot
         if plot:
-            plt.figure(figsize=(14, 6))
-            plt.plot(X, filtered_signal, label=f"Channel {i+1} Filtered")
-            plt.title(f"Filtered Signal (Channel: {i+1})")
-            plt.legend()
-            plt.show()
+            ax = axes[i // 2, i % 2]  # Row and column index for 2x2 grid
+            ax.plot(X, filtered_signal, label=f"Channel {i+1} Filtered")
+            ax.set_title(f"Filtered Signal (Channel: {i+1})")
+            ax.legend()
+
+    if plot:
+        plt.tight_layout()  # Adjust layout to prevent overlapping
+        plt.show()
 
     return np.array(results)
 
@@ -407,7 +414,7 @@ def grid_search(features):
     """
 
     # Parameter ranges
-    eps_range = np.arange(0.1, 6.0, 0.1)
+    eps_range = np.arange(0.1, 1.0, 0.1)
     minpts_range = range(1, 10)
 
     best_score = -1
@@ -614,7 +621,7 @@ if __name__ == '__main__':
         print(f'{base_path}{str(i).zfill(3)}.mat')
         file_path = f'{base_path}{str(i).zfill(3)}.mat'
         results = apply_ica(file_path)
-        results = post_process(results, 0.00001, 100, plot=False)
+        # results = post_process(results, 0.00001, 100, plot=False)
         # print(results.shape)
         mother, fetus = extract_heartbeats(results, 360)
         min_length = min(min_length, len(fetus))
