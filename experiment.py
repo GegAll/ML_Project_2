@@ -636,8 +636,20 @@ if __name__ == '__main__':
     # Clustering extracted features
     fetal_heartbeat_statistics = []
     for heartbeat in fetuses:
+        """
+        Used Features:
+        1. Average Frequency:
+            A very high or very low frequency can indicate a ill functioning heart
+        2. Standard Deviation of Frequency:
+            A high standard deviation of frequency can indicate the heart beating irregular.
+        3. Standard Deviation of Amplitude:
+            Because the data is normalized only the standard deviation of amplitude can be used. A high standard deviation indicates a changes in the hearts strength over time.
+        4. Standard Deviation of Heart Signal:
+            As for the above reasoning the absolute value is again of no value here. The standard deviation on the other hand can detect fluctuations in the baseline of the heart signal. 
+        """
         _, _, average_frequency, std_frequency, _, std_amplitude = calculate_statistics(heartbeat, 0, 360, print_statistics=False)
-        fetal_heartbeat_statistics.append([average_frequency, std_frequency, std_amplitude])
+        std_signal = np.std(heartbeat)
+        fetal_heartbeat_statistics.append([average_frequency, std_frequency, std_amplitude, std_signal])
     scalar = StandardScaler()
     scalar.fit(fetal_heartbeat_statistics)
     fetal_heartbeat_statistics = scalar.transform(fetal_heartbeat_statistics)
