@@ -388,20 +388,24 @@ def detect_heartbeat_irregularities(fetal_heartbeat, sampling_rate=360, threshol
     
     return irregular_intervals, irregular_amplitudes
 
-# def get_eps(features):
-#     k = 4
-#     nbrs = NearestNeighbors(n_neighbors=k).fit(data)
-#     distances, indices = nbrs.kneighbors(data)
-
-#     # Sort distances for plotting
-#     distances = np.sort(distances[:, -1])  # k-th nearest neighbor distance
-#     plt.plot(distances)
-#     plt.xlabel("Points sorted by distance")
-#     plt.ylabel(f"{k}-th Nearest Neighbor Distance")
-#     plt.title("K-Distance Plot")
-#     plt.show()
 
 def grid_search(features):
+    """
+    Performs a grid search to find the optimal parameters for the DBSCAN clustering algorithm
+    based on the Silhouette Score excluiding the noise points.
+
+    Parameters:
+    ----------
+    features : numpy.ndarray
+        A 2D array of input data where each row represents a data point and each column represents a feature.
+
+    Returns:
+    -------
+    tuple
+        A tuple containing the best epsilon (`eps`) and MinPts (`min_samples`) parameters:
+        (best_eps, best_min_samples).
+    """
+
     # Parameter ranges
     eps_range = np.arange(0.1, 6.0, 0.1)
     minpts_range = range(1, 10)
@@ -412,11 +416,11 @@ def grid_search(features):
     for eps in eps_range:
         for minpts in minpts_range:
             clustering = DBSCAN(eps=eps, min_samples=minpts).fit(features)
-            noise_indices = clustering.labels_ != 1
-            clustering_ex_noise = clustering.labels_[noise_indices]
-            if len(set(clustering_ex_noise)) > 1:  # Avoid single-cluster cases
-                score = silhouette_score(features[noise_indices], clustering_ex_noise)
-                print(f"Parameters: eps={eps}, MinPts={minpts}, Silhouette Score={best_score}")
+            cluster_indices = clustering.labels_ != -1
+            clustering_ex_noise = clustering.labels_[cluster_indices]
+            noise_percentage = 1 - len(clustering_ex_noise) / len(clustering.labels_)
+            if len(set(clustering_ex_noise)) > 1 and noise_percentage <= 0.3:  # Avoid single-cluster cases
+                score = silhouette_score(features[cluster_indices], clustering_ex_noise)
                 if score > best_score:
                     best_score = score
                     best_params = (eps, minpts)
