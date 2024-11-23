@@ -106,18 +106,19 @@ def post_process(result, highcut, fs=1000):
 
     return np.array(results)
 
-def plot_channels(sequence, fs=1000):
+def plot_channels(sequence, name, fs=1000):
     X = np.linspace(0, len(sequence[0]) / fs, len(sequence[0]))
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))  
 
     for i, channel in enumerate(sequence):
         ax = axes[i // 2, i % 2]  # Row and column index for 2x2 grid
-        ax.plot(X, channel, label=f"Channel {i+1} Filtered")
+        ax.plot(X[:10000], channel[:10000], label=f"Channel {i+1} Filtered")
         ax.set_title(f"Filtered Signal (Channel: {i+1})")
         ax.legend()
 
     plt.tight_layout()  # Adjust layout to prevent overlapping
-    plt.show()
+    plt.savefig(f'figs/{name}')
+    # plt.show()
 
 if __name__ == '__main__':
     synthetic_path = 'data/real/'
@@ -128,9 +129,9 @@ if __name__ == '__main__':
         print(f'{synthetic_path}a{str(i+1).zfill(2)}m.mat')
         file_path = f'{synthetic_path}a{str(i+1).zfill(2)}m.mat'
         results = load_data(file_path)
-        # results = post_process(results, , fs=1000)
+        results = post_process(results, 5, fs=1000)
         results = apply_ica(results)
-        # plot_channels(results)
+        plot_channels(results, f'a{str(i+1).zfill(2)}m')
         # results = post_process(results, 100, fs=1000, plot=True)
         # print(results.shape)
         mother, fetus = extract_heartbeats(results, sampling_rate=1000)
